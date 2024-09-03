@@ -1541,6 +1541,15 @@ class da1469x(da1468x_da1469x_da1470x):
             fileData: Byte array
             flashid: tuple extracted from the flash database
         """
+        self.link.reset()
+        if self.SYS_CTRL_REG:
+            self.link.wr_mem(16, self.SYS_CTRL_REG, self.SYS_CTRL_REG_RESET_VAL)
+            self.link.wr_mem(
+                16,
+                self.SYS_CTRL_REG,
+                self.SYS_CTRL_REG_RESET_VAL | self.SYS_CTRL_REG_SW_RESET_MSK,
+            )
+        self.link.reset()
         if fileData[:2] == b"Pp":
             logging.info("[" + self.link.Device.decode("utf-8") + "] Program image")
             self.flash_program_data(fileData, 0x0)
