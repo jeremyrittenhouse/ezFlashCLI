@@ -337,6 +337,9 @@ class pyjlink(object):
         c_buffersize = ctypes.c_int(80)
         self.jl.JLINKARM_ExecCommand(c_acIn, c_acOut, c_buffersize)
 
+        if found_device.identifier == "da1469x":
+            self.jl.JLINKARM_SetResetType(2)
+
         return found_device
 
     def close(self):
