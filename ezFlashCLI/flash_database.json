@@ -269,7 +269,13 @@
             "flash_device_type": "11",
             "flash_density": "01",
             "flash_size": "0x40000"
+        },
+        {
+            "name": "P25Q16SL",
+            "flash_manufacturer": "85",
+            "flash_device_type": "60",
+            "flash_density": "15",
+            "flash_size": "0x200000"
         }
-
     ]
 }
