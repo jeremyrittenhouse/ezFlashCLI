@@ -225,6 +225,22 @@ class da1453x_da1458x(da14xxx):
         wr_data = reg | (data << (self.shift16(bitfield_mask)))
         self.link.wr_mem(16, addr, wr_data)
 
+    def SetWord32(self, addr, data):
+        self.link.wr_mem(32, addr, data)
+
+    def GetWord32(self, addr):
+        return self.link.rd_mem(32, addr, 1)[0]
+
+    def GetBits32(self, addr, bitfield_mask):
+        reg = self.GetWord32(addr)
+        return reg & bitfield_mask
+
+    def SetBits32(self, addr, bitfield_mask, data):
+        reg = self.GetWord32(addr)
+        reg &= (~bitfield_mask) & 0xFFFFFFFF
+        wr_data = reg | (data << (self.shift16(bitfield_mask)))
+        self.link.wr_mem(32, addr, wr_data)
+
     def GPIO_SetPinFunction(self, port, pin, mode, function):
         """Set GPIO Pin function."""
         data_reg = self.P0_DATA_REG + (port << 5)
@@ -553,10 +569,12 @@ class da14531(da1453x_da1458x):
     OTP_HEADER_CELL_NUM = int(OTP_HEADER_SIZE / OTP_CELL_SIZE)
 
     SPI_PORT = 0
-    SPI_CLK_PIN = 4
-    SPI_CS_PIN = 1
-    SPI_DI_PIN = 3
-    SPI_DO_PIN = 0
+    SPI_CLK_PIN = 0
+    SPI_CS_PIN = 9
+    SPI_DI_PIN = 11
+    SPI_DO_PIN = 6
+
+    FLASH_POWER = 4
 
     def __init__(self):
         """Initalizate the da14xxxx parent devices class."""
@@ -597,6 +615,10 @@ class da14531(da1453x_da1458x):
         Args:
             None
         """
+        # Power up the flash before trying to communicate
+        self.GPIO_SetPinFunction(self.SPI_PORT, self.FLASH_POWER, 0x300, 0)
+        self.GPIO_SetActive(self.SPI_PORT, self.FLASH_POWER)
+
         self.SetWord16(self.CLK_AMBA_REG, 0x00)  # set clocks (hclk and pclk ) 16MHz
         self.SetWord16(self.SET_FREEZE_REG, 0x8)  # stop watch dog
         self.SetBits16(self.PAD_LATCH_REG, 0x1, 1)  # open pads
@@ -775,6 +797,53 @@ class da14531(da1453x_da1458x):
         read_data = super().read_flash(address, length)
         self.release_reset()
         return read_data
+
+    def otp_write(self, key, values, force):
+        assert len(values) == 1
+        address = key
+        data = values[0]
+
+        # assert 0x7F87ED0 < address < 0x7F88000  # Only expected to be used for OTP Header or CS script. Different for 535
+        assert address % 4 == 0  # Must be full 32 bit word. Programming specific bytes/ bits not supported
+        offset = (address - 0x07F80000) // 4
+
+        self.otp_init()
+        self.otp_set_mode(self.OTPC_MODE_PROG)
+
+        # self.SetWord16(self.CLK_AMBA_REG, 0x80)  # set clocks (hclk and pclk ) 16MHz and enable OTP clock
+        # self.SetWord16(self.SET_FREEZE_REG, 0x8)  # stop watch dog
+        # self.SetWord16(self.HWR_CTRL_REG, 1)  # disable HW reset
+        #
+        # # Clock is defaulted to 16 MHZ - No need to update
+        # # self.SetWord32(0x07F40010, 0x999000)
+        #
+        # # Put OTP in programmable mode
+        # self.SetBits32(0x07F40000, 0x0007, 0x3)
+        #
+        # while self.GetBits32(0x07F40004, 0x0004) == 0:
+        #     pass
+
+        self.SetWord32(0x07F4000C, data)
+        self.SetWord32(0x07F40008, offset)
+
+        # self._hw_otpc_wait_while_programming_buffer_is_full()
+        while self.GetBits32(0x07F40004, 0x0002) == 0:
+            pass
+
+        while self.GetBits32(0x07F40004, 0x0001) == 0:
+            pass
+
+        # First word that comes back is always trash.
+        # Put OTP in read mode
+        # self.SetBits32(0x07F40000, 0x0007, 0x2)
+        # self.otp_set_mode(self.OTPC_MODE_READ)
+        # print(f"self.GetWord32({hex(address)})={hex(self.GetWord32(address))} - data={hex(data)}")
+        # assert self.GetWord32(address) == data
+
+        # Put OTP back in standby
+        # self.SetBits32(0x07F40000, 0x0007, 0x0)
+        self.otp_set_mode(self.OTPC_MODE_DSTBY)
+        return 0
 
 
 class da14585(da1453x_da1458x):
