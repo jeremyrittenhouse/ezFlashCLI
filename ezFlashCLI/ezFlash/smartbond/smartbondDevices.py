@@ -653,6 +653,9 @@ class da14531(da1453x_da1458x):
         # Set SPI clock edge capture data
         self.SetBits16(self.SPI_CTRL_REG, 0x0040, 0)
 
+        self._spi_flash_wait_till_ready()
+        self._release_from_power_down()
+
     def spi_access8(self, dataToSend):
         """Send data over the SPI interface.
 
@@ -844,6 +847,66 @@ class da14531(da1453x_da1458x):
         # self.SetBits32(0x07F40000, 0x0007, 0x0)
         self.otp_set_mode(self.OTPC_MODE_DSTBY)
         return 0
+
+    def _release_from_power_down(self):
+        self.spi_cs_low()
+
+        self.spi_access8(HW_QSPI_COMMON_CMD.RELEASE_POWER_DOWN)
+
+        self.spi_cs_high()
+
+    def _spi_flash_wait_till_ready(self):
+        self.spi_cs_low()
+        # self.spi_access8(HW_QSPI_COMMON_CMD.READ_STATUS_REGISTER)
+
+        while self.spi_access8(HW_QSPI_COMMON_CMD.READ_STATUS_REGISTER) & 0x1:
+            pass
+        self.spi_cs_high()
+
+    def _spi_flash_page_program_buffer(self, data, address):
+        self._spi_flash_wait_till_ready()
+
+        self.spi_cs_low()
+        self.spi_access8(HW_QSPI_COMMON_CMD.WRITE_ENABLE)
+        self.spi_cs_high()
+
+        len_to_write = len(data) if len(data) < SPI_FLASH_PAGE_SIZE else SPI_FLASH_PAGE_SIZE
+
+        self.spi_cs_low()
+        self.spi_access8(HW_QSPI_COMMON_CMD.PAGE_PROGRAM)
+        self.spi_access8((address >> 16) & 0xFF)
+        self.spi_access8((address >> 8) & 0xFF)
+        self.spi_access8(address & 0xFF)
+
+        for byte in data[:len_to_write]:
+            while (self.GetBits16(0x50001218, 0x2000) == 1):
+                pass
+            self.SetWord16(self.SPI_FIFO_WRITE_REG, byte)
+            # self.spi_access8(byte)
+
+        self.spi_cs_high()
+
+        while self.GetBits16(0x50001218, 0x8000) == 1:
+            pass
+
+        return len_to_write
+
+    def flash_program_data(self, fileData, address=0x0):
+        """write fileData to flash address.
+
+        Args:
+            fileData: file data
+            address: start address to program
+        """
+        self.flash_init()
+        self.spi_set_bitmode(self.SPI_MODE_8BIT)
+
+        bytes_written = 0
+
+        while bytes_written < len(fileData):
+            bytes_written += self._spi_flash_page_program_buffer(fileData[bytes_written:], address + bytes_written)
+
+        return True
 
 
 class da14585(da1453x_da1458x):
