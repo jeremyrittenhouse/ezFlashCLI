@@ -228,6 +228,9 @@ class da1453x_da1458x(da14xxx):
     def SetWord32(self, addr, data):
         self.link.wr_mem(32, addr, data)
 
+    def GetWord16(self, addr):
+        return self.link.rd_mem(16, addr, 1)[0]
+
     def GetBits16(self, addr, bitfield_mask):
         reg = self.GetWord16(addr)
         return reg & bitfield_mask
