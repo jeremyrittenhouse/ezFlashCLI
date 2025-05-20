@@ -276,6 +276,13 @@
             "flash_device_type": "60",
             "flash_density": "15",
             "flash_size": "0x200000"
+        },
+        {
+            "name": "AT25EU0161A",
+            "flash_manufacturer": "1F",
+            "flash_device_type": "16",
+            "flash_density": "1",
+            "flash_size": "0x200000"
         }
     ]
 }

@@ -415,6 +415,15 @@ class da1453x_da1458x(da14xxx):
             self.flash_software_unprotect()
 
         self.link.jl.JLINKARM_BeginDownload(c_uint32(0))
+        
+        self.GPIO_SetPinFunction(self.SPI_PORT, self.FLASH_POWER, 0x300, 0)
+        self.GPIO_SetActive(self.SPI_PORT, self.FLASH_POWER)
+        self.GPIO_SetPinFunction(self.SPI_PORT, self.SPI_CS_PIN, 0x300, 29)  # SPI_CS
+        self.GPIO_SetActive(self.SPI_PORT, self.SPI_CS_PIN)
+        self.GPIO_SetPinFunction(self.SPI_PORT, self.SPI_CLK_PIN, 0x300, 28)  # SPI_CLK
+        self.GPIO_SetPinFunction(self.SPI_PORT, self.SPI_DO_PIN, 0x300, 27)  # SPI_D0
+        self.GPIO_SetPinFunction(self.SPI_PORT, self.SPI_DI_PIN, 0, 26)  # SPI_DI
+
         self.link.jl.JLINKARM_WriteMem(self.FLASH_ARRAY_BASE, len(data), c_char_p(data))
         bytes_flashed = self.link.jl.JLINKARM_EndDownload()
         if bytes_flashed < 0:
